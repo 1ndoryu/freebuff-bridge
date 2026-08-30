@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FreebuffBridgeConfig",
+  "type": "object",
+  "required": ["freebuff", "gestor", "limites"],
+  "properties": {
+    "freebuff": {
+      "type": "object",
+      "required": ["baseUrl", "projectPath", "model"],
+      "properties": {
+        "baseUrl": { "type": "string", "description": "URL base de la API local de Freebuff" },
+        "projectPath": { "type": "string", "description": "Proyecto donde Freebuff ejecutará la tarea" },
+        "model": { "type": "string", "description": "Modelo de Freebuff (deepseek/deepseek-v4-flash)" },
+        "reasoningEffort": { "enum": ["low", "high", "max"] },
+        "harnessId": { "type": "string" }
+      }
+    },
+    "gestor": {
+      "type": "object",
+      "required": ["tipo"],
+      "properties": {
+        "tipo": { "enum": ["gloryapi", "openai", "ninguno"] },
+        "gloryapi": {
+          "type": "object",
+          "required": ["baseUrl", "apiKey"],
+          "properties": {
+            "baseUrl": { "type": "string" },
+            "apiKey": { "type": "string" },
+            "model": { "type": "string" }
+          }
+        },
+        "openai": {
+          "type": "object",
+          "required": ["baseUrl", "apiKey"],
+          "properties": {
+            "baseUrl": { "type": "string" },
+            "apiKey": { "type": "string" },
+            "model": { "type": "string" }
+          }
+        }
+      }
+    },
+    "limites": {
+      "type": "object",
+      "required": ["timeoutPasoMin", "timeoutTotalMin"],
+      "properties": {
+        "timeoutPasoMin": { "type": "number", "minimum": 1 },
+        "timeoutTotalMin": { "type": "number", "minimum": 1 },
+        "watchdogInactividadMin": { "type": "number", "minimum": 1 },
+        "maxRefinamientos": { "type": "number", "minimum": 0 },
+        "maxLlamadasGestor": { "type": "number", "minimum": 1 },
+        "pollIntervalMs": { "type": "number", "minimum": 100 }
+      }
+    },
+    "http": {
+      "type": "object",
+      "required": ["puerto"],
+      "properties": {
+        "puerto": { "type": "number", "minimum": 1 },
+        "host": { "type": "string" }
+      }
+    }
+  }
+}

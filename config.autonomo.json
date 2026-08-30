@@ -1,0 +1,24 @@
+{
+  "freebuff": {
+    "baseUrl": "http://127.0.0.1:8788",
+    "projectPath": "C:/tmp/fb-bridge-test",
+    "model": "deepseek/deepseek-v4-flash",
+    "reasoningEffort": "high",
+    "harnessId": "codebuff"
+  },
+  "gestor": {
+    "tipo": "ninguno"
+  },
+  "limites": {
+    "timeoutPasoMin": 5,
+    "timeoutTotalMin": 10,
+    "watchdogInactividadMin": 2,
+    "maxRefinamientos": 1,
+    "maxLlamadasGestor": 5,
+    "pollIntervalMs": 1500
+  },
+  "http": {
+    "puerto": 4200,
+    "host": "127.0.0.1"
+  }
+}

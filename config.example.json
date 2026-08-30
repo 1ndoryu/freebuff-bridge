@@ -1,0 +1,35 @@
+{
+  "$schema": "./config.schema.json",
+  "freebuff": {
+    "baseUrl": "http://127.0.0.1:8788",
+    "projectPath": "C:/tmp/fb-bridge-test",
+    "model": "deepseek/deepseek-v4-flash",
+    "reasoningEffort": "high",
+    "harnessId": "codebuff"
+  },
+  "gestor": {
+    "tipo": "gloryapi",
+    "gloryapi": {
+      "baseUrl": "http://127.0.0.1:4100/v1/chat/completions",
+      "apiKey": "PON_AQUI_TU_CLAVE_UNIFICADA",
+      "model": "deepseek/deepseek-v4-flash"
+    },
+    "openai": {
+      "baseUrl": "https://api.openai.com/v1/chat/completions",
+      "apiKey": "sk-...",
+      "model": "gpt-4o-mini"
+    }
+  },
+  "limites": {
+    "timeoutPasoMin": 30,
+    "timeoutTotalMin": 120,
+    "watchdogInactividadMin": 5,
+    "maxRefinamientos": 2,
+    "maxLlamadasGestor": 20,
+    "pollIntervalMs": 3000
+  },
+  "http": {
+    "puerto": 4200,
+    "host": "127.0.0.1"
+  }
+}

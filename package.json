@@ -1,0 +1,43 @@
+{
+  "name": "freebuff-bridge",
+  "version": "0.1.0",
+  "description": "Puente agnóstico entre cualquier aplicación y Freebuff Desktop local (API REST). SDK JS/TS + API HTTP + CLI.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "freebuff-bridge": "dist/cli/main.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "cli": "tsx src/cli/main.ts",
+    "server": "tsx src/cli/main.ts server"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "freebuff",
+    "bridge",
+    "sdk",
+    "agente",
+    "mision"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}
