@@ -89,3 +89,37 @@ test("GestorNinguno es autónomo: plan de 1 paso y evalúa ok", async () => {
   const d = await g.evaluar(plan.pasos[0], "r", { threadId: "t", tarea: "h", projectPath: "p", messages: [] });
   assert.deepEqual(d, { tipo: "ok" });
 });
+
+test("esAutonomo() es método del port, no instanceof", () => {
+  assert.equal(new GestorGloryAPI({ baseUrl: "http://x", apiKey: "k" }).esAutonomo(), false);
+  assert.equal(new GestorNinguno().esAutonomo(), true);
+});
+
+test("GestorGloryAPI.evaluar con salida no-JSON NO aprueba en silencio (H5)", async () => {
+  const g = new GestorGloryAPI({ baseUrl: "http://x", apiKey: "k" });
+  const ctx = { threadId: "t1", tarea: "t", projectPath: "p", messages: [] };
+  const paso = { prompt: "p", criterio: "c", indice: 1 };
+
+  const restore = stubFetch([{ body: "esto no es JSON en absoluto" }]);
+  try {
+    const d = await g.evaluar(paso, "r", ctx);
+    assert.equal(d.tipo, "stop");
+    if (d.tipo === "stop") assert.match(d.motivo, /ilegible/i);
+  } finally {
+    restore();
+  }
+});
+
+test("GestorGloryAPI.evaluar con JSON sin tipo reconocido NO aprueba en silencio (H5)", async () => {
+  const g = new GestorGloryAPI({ baseUrl: "http://x", apiKey: "k" });
+  const ctx = { threadId: "t1", tarea: "t", projectPath: "p", messages: [] };
+  const paso = { prompt: "p", criterio: "c", indice: 1 };
+
+  const restore = stubFetch([{ body: JSON.stringify({ tipo: "bailar" }) }]);
+  try {
+    const d = await g.evaluar(paso, "r", ctx);
+    assert.equal(d.tipo, "stop");
+  } finally {
+    restore();
+  }
+});

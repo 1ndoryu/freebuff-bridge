@@ -25,7 +25,7 @@
     "server": "tsx src/cli/main.ts server"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.4.0"
   },
   "keywords": [
     "freebuff",

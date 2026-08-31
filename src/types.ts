@@ -131,6 +131,13 @@ export type Decision =
 export interface Gestor {
   planificar(tarea: string, ctx: Ctx): Promise<Plan>;
   evaluar(paso: Paso, resultado: string, ctx: Ctx): Promise<Decision>;
+  /**
+   * Indica si el gestor delega la ejecución al modo Misión nativo de
+   * Freebuff (true) o si el puente debe orquestar paso a paso (false).
+   * Se consulta como método para no acoplar el bridge a implementaciones
+   * concretas (DIP).
+   */
+  esAutonomo(): boolean;
 }
 
 /* -------------------------------- Resultado -------------------------------- */

@@ -28,6 +28,11 @@ export class GestorGloryAPI implements Gestor {
     this.cfg = cfg;
   }
 
+  /** Gestor externo: el puente orquesta paso a paso (no usa Misión). */
+  esAutonomo(): boolean {
+    return false;
+  }
+
   private async chat(messages: ChatMessage[]): Promise<string> {
     const res = await fetch(this.cfg.baseUrl, {
       method: "POST",
@@ -103,9 +108,11 @@ Decide SOLO JSON: {"tipo":"ok"|"refinar"|"stop","prompt":"...","motivo":"..."}
       if (obj.tipo === "ok") return { tipo: "ok" };
       if (obj.tipo === "refinar") return { tipo: "refinar", prompt: obj.prompt ?? paso.prompt };
       if (obj.tipo === "stop") return { tipo: "stop", motivo: obj.motivo ?? "criterio no alcanzable" };
+      // JSON válido pero sin tipo reconocido: no es éxito silencioso.
+      return { tipo: "stop", motivo: "evaluación ilegible: tipo de decisión no reconocido" };
     } catch {
-      /* fallthrough */
+      // Salida no-JSON: nunca aprobar en silencio (evita éxito falso).
+      return { tipo: "stop", motivo: "evaluación ilegible: la salida del gestor no era JSON válido" };
     }
-    return { tipo: "ok" };
   }
 }

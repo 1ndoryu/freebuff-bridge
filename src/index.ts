@@ -54,6 +54,12 @@ export function cargarConfig(ruta: string): BridgeConfig {
   if (!cfg.gestor?.tipo) {
     throw new Error("config.gestor.tipo requerido (gloryapi|openai|ninguno)");
   }
+  if (cfg.gestor.tipo === "gloryapi" && !cfg.gestor.gloryapi?.apiKey) {
+    throw new Error("config.gestor.gloryapi.apiKey requerida para tipo gloryapi");
+  }
+  if (cfg.gestor.tipo === "openai" && !cfg.gestor.openai?.apiKey) {
+    throw new Error("config.gestor.openai.apiKey requerida para tipo openai");
+  }
   if (!cfg.limites?.timeoutPasoMin || !cfg.limites?.timeoutTotalMin) {
     throw new Error("config.limites requiere timeoutPasoMin y timeoutTotalMin");
   }

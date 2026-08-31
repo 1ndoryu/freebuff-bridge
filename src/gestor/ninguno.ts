@@ -12,6 +12,11 @@
 import type { Ctx, Decision, Gestor, Paso, Plan } from "../types.js";
 
 export class GestorNinguno implements Gestor {
+  /** Modo autónomo: delega la ejecución a la Misión nativa de Freebuff. */
+  esAutonomo(): boolean {
+    return true;
+  }
+
   async planificar(tarea: string): Promise<Plan> {
     return {
       pasos: [{ prompt: tarea, criterio: "completar la tarea (fin de Misión)", indice: 1 }],

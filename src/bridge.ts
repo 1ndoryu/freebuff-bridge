@@ -11,7 +11,6 @@
 
 import { FreebuffClient } from "./client-freebuff.js";
 import { SseCliente } from "./client-sse.js";
-import { GestorNinguno } from "./gestor/ninguno.js";
 import type { Gestor } from "./gestor/types.js";
 import type {
   BridgeConfig,
@@ -49,7 +48,7 @@ export class FreebuffBridge {
     this.gestor = gestor;
     this.limites = cfg.limites;
     this.freebuffCfg = cfg.freebuff;
-    this.esAutonomo = gestor instanceof GestorNinguno;
+    this.esAutonomo = gestor.esAutonomo();
   }
 
   /** Envía un mensaje y espera el fin del turno (SSE) con timeout. */
@@ -57,52 +56,95 @@ export class FreebuffBridge {
     threadId: string,
     prompt: string,
     timeoutMs: number,
+    signal?: AbortSignal,
     onEvento?: (e: EventoTarea) => void
   ): Promise<void> {
     await this.client.enviarMensaje(threadId, prompt);
 
     const watchdogMin = Math.max(1, Math.ceil(this.limites.watchdogInactividadMin ?? 5));
-    await Promise.race([
-      this.sse.esperarFin(threadId, {
-        watchdogMin,
-        onEvento: (ev) => {
-          if (ev.type === "finish") onEvento?.({ tipo: "progreso", tareaId: threadId, paso: 0, total: 0, mensaje: "turno terminado" });
-        },
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout de paso (${Math.round(timeoutMs / 60000)} min)`)), timeoutMs)
-      ),
-    ]);
+    const ctrl = new AbortController();
+    const abortar = () => ctrl.abort();
+    if (signal) signal.addEventListener("abort", abortar);
+
+    try {
+      const res = await Promise.race([
+        this.sse.esperarFin(threadId, {
+          watchdogMin,
+          signal: ctrl.signal,
+          onEvento: (ev) => {
+            if (ev.type === "finish") onEvento?.({ tipo: "progreso", tareaId: threadId, paso: 0, total: 0, mensaje: "turno terminado" });
+          },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout de paso (${Math.round(timeoutMs / 60000)} min)`)), timeoutMs)
+        ),
+      ]);
+      // H6: si el stream se cerró sin finish y el turno sigue en curso, fallar.
+      if (res && res.fin === false) {
+        const snap = await this.client.snapshot(threadId).catch(() => null);
+        if (snap?.thread?.turnState === "running") {
+          throw new Error("El stream SSE se cerró sin señal de fin mientras el turno seguía en curso");
+        }
+      }
+    } finally {
+      ctrl.abort();
+      if (signal) signal.removeEventListener("abort", abortar);
+    }
   }
 
   /**
    * Espera a que la Misión termine: missionOn → false o missionStatus
-   * "stopped", con polling + SSE y watchdog de actividad.
+   * "stopped", con polling + SSE y watchdog de actividad. El SSE se aborta
+   * al terminar por polling para no dejar streams colgados.
    */
-  private async esperarFinMision(threadId: string, timeoutMs: number): Promise<void> {
+  private async esperarFinMision(
+    threadId: string,
+    timeoutMs: number,
+    signal?: AbortSignal
+  ): Promise<void> {
     const pollMs = this.limites.pollIntervalMs ?? 3000;
     const watchdogMin = Math.max(1, Math.ceil(this.limites.watchdogInactividadMin ?? 5));
     const inicio = Date.now();
+    const ctrl = new AbortController();
+    const abortar = () => ctrl.abort();
+    if (signal) signal.addEventListener("abort", abortar);
 
     // Suscripción SSE en paralelo (para actividad y detección de fin por eventos).
-    const sseP = this.sse.esperarFin(threadId, { watchdogMin }).catch(() => null);
+    const sseP = this.sse.esperarFin(threadId, { watchdogMin, signal: ctrl.signal }).catch(() => null);
 
-    // Polling del snapshot: fin de misión cuando missionOn=false o missionStatus=stopped.
-    while (Date.now() - inicio < timeoutMs) {
-      const snap = await this.client.snapshot(threadId).catch(() => null);
-      if (snap?.thread) {
-        const t = snap.thread;
-        const stopped =
-          t.missionOn === false ||
-          (t as { missionStatus?: { kind?: string } }).missionStatus?.kind === "stopped";
-        if (stopped && t.turnState === "idle") return;
-        // Si no quedó misión activa ni turnos en curso, terminó.
-        if (!t.missionOn && t.turnState !== "running") return;
+    try {
+      // Polling del snapshot: fin de misión cuando missionOn=false o missionStatus=stopped.
+      while (Date.now() - inicio < timeoutMs) {
+        if (signal?.aborted) throw new Error("Tarea cancelada por señal externa");
+        const snap = await this.client.snapshot(threadId).catch(() => null);
+        if (snap?.thread) {
+          const t = snap.thread;
+          const stopped =
+            t.missionOn === false ||
+            (t as { missionStatus?: { kind?: string } }).missionStatus?.kind === "stopped";
+          if (stopped && t.turnState === "idle") {
+            // Misión terminó: abortar el SSE antes de esperarlo.
+            ctrl.abort();
+            break;
+          }
+          // Si no quedó misión activa ni turnos en curso, terminó.
+          if (!t.missionOn && t.turnState !== "running") {
+            ctrl.abort();
+            break;
+          }
+        }
+        await new Promise((r) => setTimeout(r, pollMs));
       }
-      await new Promise((r) => setTimeout(r, pollMs));
+      // Esperar a que el SSE se cierre limpio (abortado) antes de salir.
+      await sseP;
+      if (Date.now() - inicio >= timeoutMs) {
+        throw new Error(`Timeout total de la tarea (${Math.round(timeoutMs / 60000)} min)`);
+      }
+    } finally {
+      ctrl.abort();
+      if (signal) signal.removeEventListener("abort", abortar);
+      await sseP.catch(() => null);
     }
-    await sseP.catch(() => null);
-    throw new Error(`Timeout total de la tarea (${Math.round(timeoutMs / 60000)} min)`);
   }
 
   /**
@@ -144,8 +186,8 @@ export class FreebuffBridge {
     const guardarSnapshot = async () => {
       if (!threadId) return;
       try {
-        mensajes = await this.client.mensajes(threadId);
-        const snap = await this.client.snapshot(threadId);
+        const { snap, mensajes: msgs } = await this.client.snapshotNormalizado(threadId);
+        mensajes = msgs;
         resumen = snap.thread.title ?? resumen;
       } catch {
         /* sin snapshot, seguir con lo último conocido */
@@ -185,13 +227,14 @@ export class FreebuffBridge {
         // Envía el mensaje que arranca la Misión y espera a que termine sola.
         emit({ tipo: "progreso", tareaId, paso: 1, total: 1, mensaje: "modo Misión activado, Freebuff trabaja sola" });
         await this.client.enviarMensaje(threadId, tarea);
-        await this.esperarFinMision(threadId, timeoutTotalMs);
+        await this.esperarFinMision(threadId, timeoutTotalMs, opts.signal);
         await guardarSnapshot();
       } else {
         for (const paso of pasos) {
+          if (opts.signal?.aborted) return resultado("cancelada", "tarea cancelada por señal externa");
           pasoActual = paso.indice;
           emit({ tipo: "progreso", tareaId, paso: pasoActual, total: pasos.length, mensaje: `paso ${pasoActual}: ${paso.prompt.slice(0, 80)}` });
-          await this.ejecutarTurno(threadId, paso.prompt, timeoutPasoMs, opts.onEvento);
+          await this.ejecutarTurno(threadId, paso.prompt, timeoutPasoMs, opts.signal, opts.onEvento);
           await guardarSnapshot();
 
           // Evaluar
@@ -217,7 +260,7 @@ export class FreebuffBridge {
               return resultado("fallida", `máx. refinamientos (${maxRefinamientos}) superado en paso ${pasoActual}`);
             }
             emit({ tipo: "progreso", tareaId, paso: pasoActual, total: pasos.length, mensaje: `refinando (${refinamientos}/${maxRefinamientos})` });
-            await this.ejecutarTurno(threadId, decision.prompt, timeoutPasoMs, opts.onEvento);
+            await this.ejecutarTurno(threadId, decision.prompt, timeoutPasoMs, opts.signal, opts.onEvento);
             await guardarSnapshot();
           }
         }

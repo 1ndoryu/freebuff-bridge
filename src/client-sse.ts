@@ -48,6 +48,7 @@ export class SseCliente {
   /**
    * Abre el stream y resuelve cuando ve un evento `agent` con type "finish",
    * o rechaza si el watchdog se dispara sin actividad.
+   * La llamada puede pasarse un AbortSignal propio para cancelar desde fuera.
    */
   async esperarFin(threadId: string, opts: SseOpciones = {}): Promise<Resolucion> {
     const watchdogMs = (opts.watchdogMin ?? 5) * 60_000;

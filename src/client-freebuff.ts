@@ -116,6 +116,18 @@ export class FreebuffClient {
     return this.normalizarMensajes(snap.messages ?? []);
   }
 
+  /**
+   * Snapshot + mensajes normalizados en UNA sola petición GET.
+   * Evita el doble fetch del mismo endpoint (mensajes + snapshot).
+   */
+  async snapshotNormalizado(threadId: string): Promise<{
+    snap: ThreadSnapshot;
+    mensajes: ThreadMessage[];
+  }> {
+    const snap = await this.snapshot(threadId);
+    return { snap, mensajes: this.normalizarMensajes(snap.messages ?? []) };
+  }
+
   /** Normaliza un mensaje crudo del snapshot a ThreadMessage. */
   private normalizarMensajes(raw: ThreadSnapshot["messages"]): ThreadMessage[] {
     return raw.map((m, i) => {

@@ -26,7 +26,8 @@ gratis con el modelo DeepSeek Flash.
 
 ## Requisitos
 
-- Node.js ≥ 20 (probado con Node 24) y npm.
+- Node.js ≥ 18.4 (probado con Node 24) y npm. `crypto.randomUUID` (global) requiere
+  18.4+.
 - **Freebuff Desktop** corriendo en loopback con su API local (por defecto
   `http://127.0.0.1:8787`; la standalone de desarrollo usa `http://127.0.0.1:8788`).
 - Opcional: una API compatible con OpenAI (`/v1/chat/completions`) como GloryAPI para el
@@ -104,8 +105,10 @@ Ver [`config.example.json`](./config.example.json). Los campos clave:
 | `GET` | `/task/:id/events` | SSE de eventos (`creada`, `progreso`, `fin`, `error`) con replay |
 | `GET` | `/health` | `{ ok: true }` |
 
-El servidor es **loopback por defecto** (`127.0.0.1`) y no exige token; solo úsalo en la
-máquina local o detrás de un proxy con control de acceso.
+El servidor es **loopback por defecto** (`127.0.0.1`) y no exige token. Solo se aceptan
+peticiones cuyo `Host` y `Origin` (si lo hay) sean loopback — evita CSRF si el puerto se
+expone por proxy o `0.0.0.0`. Las tareas terminadas se retienen 1 h (TTL) y como máximo
+200 simultáneas (evicción LRU simple); nunca crece sin límite.
 
 ## Arquitectura
 
@@ -132,7 +135,7 @@ tu app ──▶ bridge (SDK / HTTP) ──▶ Freebuff local (API REST + SSE)
 ## Tests
 
 ```bash
-npm test          # node:test + tsx (15 tests)
+npm test          # node:test + tsx (21 tests)
 npm run type-check
 ```
 

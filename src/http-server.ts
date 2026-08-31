@@ -17,10 +17,16 @@ import { crearGestor } from "./gestor/types.js";
 interface TareaEnMemoria {
   id: string;
   tarea: string;
+  creadaEn: number;
   resultado: Promise<ResultadoTarea>;
   eventos: EventoTarea[];
   suscriptores: Set<(e: EventoTarea) => void>;
 }
+
+/** Retención máxima de una tarea terminada antes de evictarla. */
+const TTL_MS = 60 * 60 * 1000; // 1 hora
+/** Límite de tareas retenidas en memoria (protege servidor de larga vida). */
+const MAX_TAREAS = 200;
 
 export class BridgeHttpServer {
   private server: ReturnType<typeof createServer>;
@@ -34,6 +40,36 @@ export class BridgeHttpServer {
     this.puerto = httpCfg.puerto;
     this.host = httpCfg.host ?? "127.0.0.1";
     this.server = createServer((req, res) => void this.handle(req, res));
+  }
+
+  /** ¿Es un host/origen loopback permitido? */
+  private esLoopback(host: string): boolean {
+    const h = host.replace(/:\d+$/, "").toLowerCase();
+    return h === "127.0.0.1" || h === "localhost" || h === "::1" || h === "[::1]";
+  }
+
+  /**
+   * Evicción: borra tareas expiradas (TTL) y, si se supera el límite,
+   * las más antiguas. Evita que el Map crezca sin límite en servidor largo.
+   */
+  private evictar(): void {
+    const ahora = Date.now();
+    for (const [id, t] of this.tareas) {
+      if (ahora - t.creadaEn > TTL_MS) this.tareas.delete(id);
+    }
+    while (this.tareas.size > MAX_TAREAS) {
+      // Elimina la más antigua.
+      let vieja: string | null = null;
+      let viejaTs = Infinity;
+      for (const [id, t] of this.tareas) {
+        if (t.creadaEn < viejaTs) {
+          viejaTs = t.creadaEn;
+          vieja = id;
+        }
+      }
+      if (vieja === null) break;
+      this.tareas.delete(vieja);
+    }
   }
 
   private json(res: ServerResponse, code: number, body: unknown): void {
@@ -56,12 +92,24 @@ export class BridgeHttpServer {
       return;
     }
 
+    // M2: solo se permite el acceso si el host y el origin son loopback
+    // (evita CSRF si alguien expone el puerto por proxy o 0.0.0.0).
+    const host = (req.headers.host ?? "").toLowerCase();
+    const origin = (req.headers.origin ?? "").toLowerCase();
+    const hostOk = !host || this.esLoopback(host);
+    const originOk = !origin || origin.startsWith("http://127.0.0.1") || origin.startsWith("http://localhost") || origin.startsWith("http://[::1]");
+    if (!hostOk || !originOk) {
+      this.json(res, 403, { error: "acceso denegado: origen no loopback" });
+      return;
+    }
+
     if (req.method === "GET" && path === "/health") {
       this.json(res, 200, { ok: true, puerto: this.puerto });
       return;
     }
 
     if (req.method === "POST" && path === "/task") {
+      this.evictar();
       const body = await this.readBody(req);
       const tarea = (body as { tarea?: string })?.tarea;
       if (!tarea || typeof tarea !== "string" || !tarea.trim()) {
@@ -76,14 +124,12 @@ export class BridgeHttpServer {
       const entrada: TareaEnMemoria = {
         id,
         tarea,
+        creadaEn: Date.now(),
         resultado: bridge.runTask(tarea, { onEvento: (e) => this.emit(entrada, e) }),
         eventos: [],
         suscriptores: new Set(),
       };
       this.tareas.set(id, entrada);
-      entrada.resultado.finally(() => {
-        // Mantener el resultado consultable; no borrar.
-      });
       this.json(res, 202, { id, threadId: undefined, estado: "lanzada" });
       return;
     }

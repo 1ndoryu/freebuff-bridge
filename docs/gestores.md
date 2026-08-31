@@ -6,11 +6,20 @@ El puente depende solo de una interfaz (port):
 export interface Gestor {
   planificar(tarea: string, ctx: Ctx): Promise<Plan>;
   evaluar(paso: Paso, resultado: string, ctx: Ctx): Promise<Decision>;
+  /** true → el gestor delega la ejecución al modo Misión nativo de Freebuff. */
+  esAutonomo(): boolean;
 }
 ```
 
 El gestor **nunca ejecuta trabajo**: solo decide. La ejecución siempre la hace Freebuff
 local (gratis). Esto mantiene el gasto en tokens del gestor mínimo y predecible.
+
+### `esAutonomo() → boolean`
+
+Indica al bridge si debe usar el **modo Misión nativo de Freebuff** (autónomo) o
+orquestar paso a paso (dirigido). Es un método del port (no `instanceof`), así que un
+consumidor puede implementar su propio gestor autónomo sin depender de una clase
+concreta.
 
 ## Contratos
 
@@ -42,7 +51,8 @@ Habla con GloryAPI (`POST /v1/chat/completions`, clave unificada, Bearer). Usa u
 prompt que pide JSON estricto para `planificar` y `evaluar`, con fallback seguro:
 
 - Si `planificar` no devuelve JSON → un solo paso con el texto como prompt.
-- Si `evaluar` no devuelve JSON → `{ tipo: "ok" }` (no se bloquea la tarea).
+- Si `evaluar` no devuelve JSON o devuelve un tipo no reconocido → `{ tipo: "stop",
+  motivo: "evaluación ilegible: ..." }` (nunca aprueba en silencio; evita éxito falso).
 
 Config:
 
@@ -76,8 +86,8 @@ Misma lógica que GloryAPI pero para **cualquier** endpoint compatible con
 
 ### `GestorNinguno` (`tipo: "ninguno"`)
 
-Modo **autónomo**: no hay gestor externo. El bridge detecta
-`gestor instanceof GestorNinguno` y usa el **modo Misión nativo de Freebuff**:
+Modo **autónomo**: no hay gestor externo. `esAutonomo()` devuelve `true` y el bridge usa
+el **modo Misión nativo de Freebuff**:
 
 1. Activa `missionOn(true)`, fija `missionEffort(3)` y `missionPrompt(tarea)`.
 2. Envía la tarea como mensaje.
