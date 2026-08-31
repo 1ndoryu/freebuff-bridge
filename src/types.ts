@@ -170,13 +170,24 @@ export interface ResultadoTarea {
   resumen?: string;
   pasos: Paso[];
   pasoActual: number;
-  llamadasGestor: number;
   mensajes: ThreadMessage[];
-  receipts?: ReceiptResumen[];
   error?: string;
+}
+
+/**
+ * Metadata de ejecución (ISP): conteos, receipts y tiempos son un eje distinto
+ * del resultado de la tarea. Componiendo `ResultadoEjecucion` se mantienen
+ * planos para el consumidor sin una interfaz de 12 campos.
+ */
+export interface ResultadoTareaMeta {
+  llamadasGestor: number;
+  receipts?: ReceiptResumen[];
   iniciadaEn: string;
   terminadaEn?: string;
 }
+
+/** Resultado plano completo: outcome + metadata de ejecución. */
+export type ResultadoEjecucion = ResultadoTarea & ResultadoTareaMeta;
 
 /* ------------------------------ Eventos del SDK ----------------------------- */
 

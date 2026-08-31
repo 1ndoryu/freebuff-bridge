@@ -9,10 +9,11 @@
 
 import { parseArgs } from "node:util";
 import { cargarConfig, crearGestor, FreebuffBridge } from "../index.js";
+import { log, logError } from "../logger.js";
 import { BridgeHttpServer } from "../http-server.js";
 
 function ayuda(): void {
-  console.log(`freebuff-bridge — puente agnóstico entre tu app y Freebuff local
+  log("", `freebuff-bridge — puente agnóstico entre tu app y Freebuff local
 
 USO:
   freebuff-bridge run "tarea" [--config config.json] [--autonomo]
@@ -63,23 +64,23 @@ async function main(): Promise<void> {
     case "run": {
       const tarea = positionals[1];
       if (!tarea) {
-        console.error("Uso: freebuff-bridge run \"tarea\" [--config config.json]");
+        logError("", 'Uso: freebuff-bridge run "tarea" [--config config.json]');
         process.exitCode = 1;
         return;
       }
       const gestor = crearGestor(cfg.gestor);
       const bridge = new FreebuffBridge(cfg, gestor);
-      console.log(`[freebuff-bridge] Lanzando tarea (gestor: ${cfg.gestor.tipo})...`);
+      log("", `[freebuff-bridge] Lanzando tarea (gestor: ${cfg.gestor.tipo})...`);
       const r = await bridge.runTask(tarea, {
         onEvento: (e) => {
-          if (e.tipo === "progreso") console.log(`  [${e.tipo}] paso ${e.paso}/${e.total}: ${e.mensaje}`);
-          else if (e.tipo === "creada") console.log(`  [creada] thread ${e.threadId}`);
-          else if (e.tipo === "fin") console.log(`  [fin] estado=${e.estado}`);
-          else if (e.tipo === "error") console.error(`  [error] ${e.error}`);
+          if (e.tipo === "progreso") log("", `  [${e.tipo}] paso ${e.paso}/${e.total}: ${e.mensaje}`);
+          else if (e.tipo === "creada") log("", `  [creada] thread ${e.threadId}`);
+          else if (e.tipo === "fin") log("", `  [fin] estado=${e.estado}`);
+          else if (e.tipo === "error") logError("", `  [error] ${e.error}`);
         },
       });
-      console.log("\n=== RESULTADO ===");
-      console.log(JSON.stringify(r, null, 2));
+      log("", "\n=== RESULTADO ===");
+      log("", JSON.stringify(r, null, 2));
       process.exitCode = r.estado === "completada" ? 0 : 1;
       return;
     }
@@ -87,11 +88,11 @@ async function main(): Promise<void> {
       const port = values.port ? parseInt(values.port, 10) : (cfg.http?.puerto ?? 4200);
       const srv = new BridgeHttpServer(() => cfg, { puerto: port, host: cfg.http?.host ?? "127.0.0.1" });
       const puertoReal = await srv.listen();
-      console.log(`[freebuff-bridge] Servidor HTTP escuchando en http://127.0.0.1:${puertoReal}`);
-      console.log("  POST /task            → lanza una tarea");
-      console.log("  GET  /task/:id        → estado/resultado");
-      console.log("  GET  /task/:id/events → eventos SSE");
-      console.log("  GET  /health          → ok");
+      log("", `[freebuff-bridge] Servidor HTTP escuchando en http://127.0.0.1:${puertoReal}`);
+      log("", "  POST /task            → lanza una tarea");
+      log("", "  GET  /task/:id        → estado/resultado");
+      log("", "  GET  /task/:id/events → eventos SSE");
+      log("", "  GET  /health          → ok");
       // Mantener el proceso vivo.
       await new Promise<void>(() => {});
       return;
@@ -101,21 +102,21 @@ async function main(): Promise<void> {
       const client = new FreebuffClient(cfg.freebuff);
       try {
         const st = await client.authStatus();
-        console.log(`[freebuff-bridge] Freebuff en ${cfg.freebuff.baseUrl}: ${st.authed ? "autenticado" : "NO autenticado"}`);
+        log("", `[freebuff-bridge] Freebuff en ${cfg.freebuff.baseUrl}: ${st.authed ? "autenticado" : "NO autenticado"}`);
       } catch (e) {
-        console.error(`[freebuff-bridge] No se pudo contactar con Freebuff: ${(e as Error).message}`);
+        logError("", `[freebuff-bridge] No se pudo contactar con Freebuff: ${(e as Error).message}`);
         process.exitCode = 1;
       }
       return;
     }
     default:
-      console.error(`Comando desconocido: ${cmd}`);
+      logError("", `Comando desconocido: ${cmd}`);
       ayuda();
       process.exitCode = 1;
   }
 }
 
 main().catch((e) => {
-  console.error(`[freebuff-bridge] Error: ${(e as Error).message}`);
+  logError("", `[freebuff-bridge] Error: ${(e as Error).message}`);
   process.exitCode = 1;
-});
+});

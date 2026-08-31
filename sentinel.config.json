@@ -20,7 +20,11 @@
         "includePatterns": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.css"],
         "excludePatterns": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.git/**"],
         "directoryExceptions": [],
-        "portableBoundaries": {},
+        "portableBoundaries": {
+          "loggerModules": [
+            "/src/logger.ts"
+          ]
+        },
         "rules": {},
         "runtime": {
           "minimumVersion": "",

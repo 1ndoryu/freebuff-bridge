@@ -16,7 +16,7 @@ import type {
   BridgeConfig,
   EstadoTarea,
   EventoTarea,
-  ResultadoTarea,
+  ResultadoEjecucion,
   ThreadMessage,
 } from "./types.js";
 
@@ -151,7 +151,7 @@ export class FreebuffBridge {
    * Ejecuta una tarea end-to-end.
    * Devuelve el resultado final (completada/fallida/cancelada/timeout).
    */
-  async runTask(tarea: string, opts: OpcionesEjecucion = {}): Promise<ResultadoTarea> {
+  async runTask(tarea: string, opts: OpcionesEjecucion = {}): Promise<ResultadoEjecucion> {
     const tareaId = crypto.randomUUID();
     const iniciadaEn = new Date().toISOString();
     const timeoutTotalMs = this.limites.timeoutTotalMin * 60_000;
@@ -166,9 +166,9 @@ export class FreebuffBridge {
     let threadId = "";
     let mensajes: ThreadMessage[] = [];
     let resumen = "";
-    let receipts: ResultadoTarea["receipts"] = [];
+    let receipts: ResultadoEjecucion["receipts"] = [];
 
-    const resultado = (estado: EstadoTarea, error?: string): ResultadoTarea => ({
+    const resultado = (estado: EstadoTarea, error?: string): ResultadoEjecucion => ({
       id: tareaId,
       threadId,
       estado,
@@ -276,7 +276,7 @@ export class FreebuffBridge {
       // 5. Cerrar: receipts (si Misión) y resultado
       if (this.esAutonomo) {
         try {
-          const r = (await this.client.missionReceipts(threadId)) as ResultadoTarea["receipts"];
+          const r = (await this.client.missionReceipts(threadId)) as ResultadoEjecucion["receipts"];
           receipts = Array.isArray(r) ? r : [];
         } catch {
           receipts = [];
