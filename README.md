@@ -43,6 +43,10 @@ npm run type-check                    # comprueba tipos
 npm test                              # suite de tests
 ```
 
+> `dist/` no se versiona (gitignored): `main`/`exports`/`bin` apuntan a él. Antes de
+> consumir el paquete como dependencia o publicarlo, ejecuta `npm run build` para
+> regenerarlo.
+
 ## Uso rápido (CLI)
 
 ```bash

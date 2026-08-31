@@ -166,6 +166,7 @@ export class BridgeHttpServer {
 
     const mTask = path.match(/^\/task\/([^/]+)$/);
     if (req.method === "GET" && mTask) {
+      this.evictar(); // evita entradas muertas en servidores de larga vida
       const entrada = this.tareas.get(mTask[1]);
       if (!entrada) {
         this.json(res, 404, { error: "tarea no encontrada" });
@@ -178,6 +179,7 @@ export class BridgeHttpServer {
 
     const mEvents = path.match(/^\/task\/([^/]+)\/events$/);
     if (req.method === "GET" && mEvents) {
+      this.evictar();
       const entrada = this.tareas.get(mEvents[1]);
       if (!entrada) {
         this.json(res, 404, { error: "tarea no encontrada" });
