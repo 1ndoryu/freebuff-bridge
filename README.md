@@ -131,6 +131,8 @@ tu app ──▶ bridge (SDK / HTTP) ──▶ Freebuff local (API REST + SSE)
 - [`docs/gestores.md`](./docs/gestores.md) — el port `Gestor` y sus implementaciones.
 - [`docs/api-local-freebuff.md`](./docs/api-local-freebuff.md) — la API local de Freebuff
   que usa el cliente (endpoints verificados en el bundle).
+- [`docs/evidencia/e2e-2026-08-30.md`](./docs/evidencia/e2e-2026-08-30.md) — evidencia de
+  las verificaciones E2E reales (CLI, HTTP y suite).
 
 ## Tests
 
