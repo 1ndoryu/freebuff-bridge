@@ -137,7 +137,7 @@ tu app ──▶ bridge (SDK / HTTP) ──▶ Freebuff local (API REST + SSE)
 ## Tests
 
 ```bash
-npm test          # node:test + tsx (26 tests)
+npm test          # node:test + tsx (30 tests)
 npm run type-check
 ```
 

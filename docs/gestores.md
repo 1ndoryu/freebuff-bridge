@@ -54,6 +54,10 @@ prompt que pide JSON estricto para `planificar` y `evaluar`, con fallback seguro
 - Si `evaluar` no devuelve JSON o devuelve un tipo no reconocido → `{ tipo: "stop",
   motivo: "evaluación ilegible: ..." }` (nunca aprueba en silencio; evita éxito falso).
 
+Convención del bridge sobre `stop` (H5): si el `motivo` contiene "ilegible", la tarea
+termina como `fallida` (fallo de evaluación del gestor); en cualquier otro caso, `stop`
+significa cancelación por criterio del gestor y la tarea termina como `cancelada`.
+
 Config:
 
 ```json
