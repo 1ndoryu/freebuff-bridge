@@ -189,6 +189,39 @@ test("H4: signal externo cancela la tarea", async () => {
   assert.equal(r.estado, "cancelada");
 });
 
+test("H5: stop por salida ilegible del gestor → fallida (no cancelada)", async () => {
+  const cfg = cfgBasica();
+  const gestor: Gestor = {
+    esAutonomo: () => false,
+    async planificar(tarea: string): Promise<Plan> {
+      return { pasos: [{ prompt: tarea, criterio: "c", indice: 1 }] };
+    },
+    async evaluar(): Promise<{ tipo: "stop"; motivo: string }> {
+      return { tipo: "stop", motivo: "evaluación ilegible: la salida del gestor no era JSON válido" };
+    },
+  };
+  const b = new FreebuffBridge(cfg, gestor, { client: clientMock() as never, sse: sseMock() as never });
+  const r = await b.runTask("haz algo", {});
+  assert.equal(r.estado, "fallida");
+  assert.match(r.error ?? "", /ilegible/i);
+});
+
+test("H5: stop por criterio del gestor → cancelada", async () => {
+  const cfg = cfgBasica();
+  const gestor: Gestor = {
+    esAutonomo: () => false,
+    async planificar(tarea: string): Promise<Plan> {
+      return { pasos: [{ prompt: tarea, criterio: "c", indice: 1 }] };
+    },
+    async evaluar(): Promise<{ tipo: "stop"; motivo: string }> {
+      return { tipo: "stop", motivo: "el gestor decidió no continuar" };
+    },
+  };
+  const b = new FreebuffBridge(cfg, gestor, { client: clientMock() as never, sse: sseMock() as never });
+  const r = await b.runTask("haz algo", {});
+  assert.equal(r.estado, "cancelada");
+});
+
 test("H6: SSE cierra sin finish con turno running → fallida", async () => {
   const cfg = cfgBasica();
   // SSE devuelve fin:false (stream cerrado sin finish).

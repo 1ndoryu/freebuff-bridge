@@ -19,12 +19,15 @@ interface TareaEnMemoria {
   tarea: string;
   creadaEn: number;
   resultado: Promise<ResultadoTarea>;
+  terminada: boolean;
   eventos: EventoTarea[];
   suscriptores: Set<(e: EventoTarea) => void>;
 }
 
-/** Retención máxima de una tarea terminada antes de evictarla. */
-const TTL_MS = 60 * 60 * 1000; // 1 hora
+/** Retención base de una tarea terminada antes de evictarla. */
+const TTL_BASE_MS = 60 * 60 * 1000; // 1 hora
+/** Margen extra sobre el timeout total por defecto para no evictar tareas en curso. */
+const TTL_MARGEN_MS = 10 * 60 * 1000; // 10 min
 /** Límite de tareas retenidas en memoria (protege servidor de larga vida). */
 const MAX_TAREAS = 200;
 
@@ -51,18 +54,26 @@ export class BridgeHttpServer {
   /**
    * Evicción: borra tareas expiradas (TTL) y, si se supera el límite,
    * las más antiguas. Evita que el Map crezca sin límite en servidor largo.
+   * El TTL nunca es menor que el timeout total de la config (más margen), y
+   * las tareas aún en curso (`terminada: false`) nunca se evictan.
    */
   private evictar(): void {
+    const cfg = this.configFactory();
+    const ttlMs = Math.max(
+      TTL_BASE_MS,
+      (cfg.limites?.timeoutTotalMin ?? 60) * 60_000 + TTL_MARGEN_MS
+    );
     const ahora = Date.now();
     for (const [id, t] of this.tareas) {
-      if (ahora - t.creadaEn > TTL_MS) this.tareas.delete(id);
+      if (t.terminada && ahora - t.creadaEn > ttlMs) this.tareas.delete(id);
     }
     while (this.tareas.size > MAX_TAREAS) {
-      // Elimina la más antigua.
+      // Elimina la terminada más antigua; si no hay ninguna, se detiene
+      // (no evictar tareas en curso).
       let vieja: string | null = null;
       let viejaTs = Infinity;
       for (const [id, t] of this.tareas) {
-        if (t.creadaEn < viejaTs) {
+        if (t.terminada && t.creadaEn < viejaTs) {
           viejaTs = t.creadaEn;
           vieja = id;
         }
@@ -97,7 +108,16 @@ export class BridgeHttpServer {
     const host = (req.headers.host ?? "").toLowerCase();
     const origin = (req.headers.origin ?? "").toLowerCase();
     const hostOk = !host || this.esLoopback(host);
-    const originOk = !origin || origin.startsWith("http://127.0.0.1") || origin.startsWith("http://localhost") || origin.startsWith("http://[::1]");
+    let originOk = !origin;
+    if (!originOk) {
+      try {
+        // Compara hostname exacto (evita bypass tipo 127.0.0.1.evil.com).
+        const u = new URL(origin);
+        originOk = (u.protocol === "http:" || u.protocol === "https:") && this.esLoopback(u.hostname);
+      } catch {
+        originOk = false; // Origin malformado → denegar
+      }
+    }
     if (!hostOk || !originOk) {
       this.json(res, 403, { error: "acceso denegado: origen no loopback" });
       return;
@@ -125,10 +145,20 @@ export class BridgeHttpServer {
         id,
         tarea,
         creadaEn: Date.now(),
+        terminada: false,
         resultado: bridge.runTask(tarea, { onEvento: (e) => this.emit(entrada, e) }),
         eventos: [],
         suscriptores: new Set(),
       };
+      // Marca la entrada como terminada cuando la promesa resuelve (para la evicción).
+      void entrada.resultado.then(
+        () => {
+          entrada.terminada = true;
+        },
+        () => {
+          entrada.terminada = true;
+        }
+      );
       this.tareas.set(id, entrada);
       this.json(res, 202, { id, threadId: undefined, estado: "lanzada" });
       return;

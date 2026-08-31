@@ -253,7 +253,14 @@ export class FreebuffBridge {
               { threadId, tarea, projectPath: this.freebuffCfg.projectPath, messages: mensajes }
             );
             if (decision.tipo === "ok") break;
-            if (decision.tipo === "stop") return resultado("cancelada", decision.motivo);
+            if (decision.tipo === "stop") {
+              // Un stop por salida ilegible del gestor es un fallo de la
+              // evaluación (H5), no una cancelación por criterio del gestor.
+              const esIlegible = /ilegible/i.test(decision.motivo ?? "");
+              return esIlegible
+                ? resultado("fallida", decision.motivo)
+                : resultado("cancelada", decision.motivo);
+            }
             // refinar
             refinamientos++;
             if (refinamientos > maxRefinamientos) {
@@ -280,6 +287,14 @@ export class FreebuffBridge {
       return resultado("completada");
     } catch (e) {
       const err = e instanceof Error ? e.message : String(e);
+      // La cancelación por señal externa siempre se clasifica como "cancelada",
+      // aunque el abort llegue como error desde el SSE o el polling.
+      if (opts.signal?.aborted) {
+        emit({ tipo: "error", tareaId, error: err });
+        emit({ tipo: "fin", tareaId, estado: "cancelada" });
+        await guardarSnapshot();
+        return resultado("cancelada", "tarea cancelada por señal externa");
+      }
       const esTimeout = /timeout/i.test(err) || /watchdog/i.test(err);
       const estado: EstadoTarea = esTimeout ? "timeout" : "fallida";
       emit({ tipo: "error", tareaId, error: err });

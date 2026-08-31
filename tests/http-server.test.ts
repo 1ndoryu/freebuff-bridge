@@ -60,6 +60,30 @@ test("M2: acepta peticiones sin Origin (curl/CLI)", async () => {
   }
 });
 
+test("M2: rechaza Origin con hostname que empieza por 127.0.0.1 (bypass) (403)", async () => {
+  const { s, puertoReal } = await arrancarServidor(0);
+  try {
+    const res = await fetch(`http://127.0.0.1:${puertoReal}/health`, {
+      headers: { origin: "http://127.0.0.1.evil.com" },
+    });
+    assert.equal(res.status, 403);
+  } finally {
+    await s.close();
+  }
+});
+
+test("M2: rechaza Origin malformado (403)", async () => {
+  const { s, puertoReal } = await arrancarServidor(0);
+  try {
+    const res = await fetch(`http://127.0.0.1:${puertoReal}/health`, {
+      headers: { origin: "no-es-una-url" },
+    });
+    assert.equal(res.status, 403);
+  } finally {
+    await s.close();
+  }
+});
+
 test("M1: POST /task sin tarea devuelve 400", async () => {
   const { s, puertoReal } = await arrancarServidor(0);
   try {
