@@ -22,7 +22,11 @@
     "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "cli": "tsx src/cli/main.ts",
-    "server": "tsx src/cli/main.ts server"
+    "server": "tsx src/cli/main.ts server",
+    "quality:doctor": "sentinel doctor --json",
+    "quality:setup": "node scripts/quality/quality-setup.mjs",
+    "quality:lock": "node scripts/quality/lock-generator.mjs",
+    "quality:lock:check": "node scripts/quality/lock-generator.mjs"
   },
   "engines": {
     "node": ">=18.4.0"
