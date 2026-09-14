@@ -23,6 +23,8 @@ import type {
 export interface OpcionesEjecucion {
   onEvento?: (e: EventoTarea) => void;
   signal?: AbortSignal;
+  /** Override del timeout total (min) para esta llamada; por defecto limites.timeoutTotalMin. */
+  timeoutTotalMin?: number;
 }
 
 /** Dependencias inyectables (para tests). */
@@ -135,6 +137,9 @@ export class FreebuffBridge {
         }
         await new Promise((r) => setTimeout(r, pollMs));
       }
+      // El bucle salió por tiempo: abortar el SSE para que el timeout sea
+      // duro y no quede atado a su watchdog. El cliente real resuelve al abortar.
+      ctrl.abort();
       // Esperar a que el SSE se cierre limpio (abortado) antes de salir.
       await sseP;
       if (Date.now() - inicio >= timeoutMs) {
@@ -154,7 +159,7 @@ export class FreebuffBridge {
   async runTask(tarea: string, opts: OpcionesEjecucion = {}): Promise<ResultadoEjecucion> {
     const tareaId = crypto.randomUUID();
     const iniciadaEn = new Date().toISOString();
-    const timeoutTotalMs = this.limites.timeoutTotalMin * 60_000;
+    const timeoutTotalMs = (opts.timeoutTotalMin ?? this.limites.timeoutTotalMin) * 60_000;
     const timeoutPasoMs = this.limites.timeoutPasoMin * 60_000;
     const maxLlamadas = this.limites.maxLlamadasGestor ?? DEFAULT_LLAMADAS;
     const maxRefinamientos = this.limites.maxRefinamientos ?? DEFAULT_REFINAMIENTOS;

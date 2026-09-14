@@ -140,3 +140,27 @@ test("authStatus llama a /api/auth/status", async () => {
     restore();
   }
 });
+
+test("cerrarHilo hace POST /api/thread/:id/close (libera el slot)", async () => {
+  const { calls, restore } = stubFetch({ ok: true });
+  try {
+    const c = new FreebuffClient(cfg());
+    const r = await c.cerrarHilo("t1");
+    assert.deepEqual(r, { ok: true });
+    assert.equal(calls[0].url, "http://127.0.0.1:8788/api/thread/t1/close");
+    assert.equal(calls[0].init?.method, "POST");
+  } finally {
+    restore();
+  }
+});
+
+test("cerrarHilo con borrar:true hace POST /api/thread/:id/delete", async () => {
+  const { calls, restore } = stubFetch({ ok: true });
+  try {
+    const c = new FreebuffClient(cfg());
+    await c.cerrarHilo("t1", true);
+    assert.equal(calls[0].url, "http://127.0.0.1:8788/api/thread/t1/delete");
+  } finally {
+    restore();
+  }
+});

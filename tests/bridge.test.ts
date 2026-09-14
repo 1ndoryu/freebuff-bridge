@@ -255,3 +255,22 @@ test("H2/H3: el bridge aborta el SSE al terminar la tarea (sin stream colgado)",
   assert.equal(r.estado, "completada");
   assert.equal(aborted, true, "el SSE debe abortarse al terminar");
 });
+
+test("runTask respeta timeoutTotalMin por llamada (incluye threadId)", async () => {
+  const cfg = cfgBasica();
+  // SSE que nunca termina solo, pero sí resuelve al abortar (como el real).
+  const sseEterno = {
+    esperarFin: (_id: string, opts?: { signal?: AbortSignal }) =>
+      new Promise((resolve) => {
+        opts?.signal?.addEventListener("abort", () => resolve({ fin: false, ultimoEvento: null }));
+      }),
+  };
+  const b = new FreebuffBridge(cfg, new GestorNinguno(), {
+    client: clientMock({ missionOn: true, turnState: "running" }) as never,
+    sse: sseEterno as never,
+  });
+  const r = await b.runTask("tarea eterna", { timeoutTotalMin: 0.02 });
+  assert.equal(r.estado, "timeout");
+  assert.equal(r.threadId, "thread-1");
+  assert.match(r.error ?? "", /timeout/i);
+});

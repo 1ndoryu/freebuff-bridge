@@ -149,6 +149,19 @@ export class FreebuffClient {
     return this.req(`/api/thread/${threadId}/stop`, { method: "POST", body: "{}" });
   }
 
+  /**
+   * POST /api/thread/:id/close (o /delete con borrar:true) — cierra el hilo
+   * y libera su slot de modelo ilimitado en el servidor (3 simultáneos).
+   * Cerrar conserva el historial; borrar lo elimina. Verificado en el bundle
+   * del orchestrator (threadAction close/delete → sessions.release).
+   */
+  async cerrarHilo(threadId: string, borrar = false): Promise<{ ok: boolean }> {
+    return this.req(`/api/thread/${threadId}/${borrar ? "delete" : "close"}`, {
+      method: "POST",
+      body: "{}",
+    });
+  }
+
   /* ------------------------------ Modo Misión ------------------------------ */
 
   async setMissionOn(threadId: string, on: boolean): Promise<{ ok: boolean }> {
